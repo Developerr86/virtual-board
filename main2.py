@@ -20,7 +20,6 @@ def scale_points(points, orig_size, new_size):
     return [(int(x * new_width / orig_width), int(y * new_height / orig_height)) for (x, y) in points]
 
 def is_pointing_finger_up(hand_landmarks):
-    # Check if the index finger is up and other fingers are down
     if (hand_landmarks.landmark[8].y < hand_landmarks.landmark[6].y and  # Index finger tip is above PIP joint
         hand_landmarks.landmark[12].y > hand_landmarks.landmark[10].y and  # Middle finger tip is below PIP joint
         hand_landmarks.landmark[16].y > hand_landmarks.landmark[14].y and  # Ring finger tip is below PIP joint
@@ -45,14 +44,16 @@ mp_draw = mp.solutions.drawing_utils
 
 draw_points = []
 draw_times = []
+opacities = []
 
 # Get display size and calculate window size
 display_width, display_height = get_display_size()
 window_width = int(display_width * 0.9)
 window_height = int(display_height * 0.9)
 
-# Control recording with a boolean variable
+# Control recording and auto-clean with boolean variables
 recording = False  # Set this to False to stop recording
+auto_clean = False  # Set this to False to disable auto clean
 
 while True:
     ret, frame = cap.read()
@@ -73,12 +74,13 @@ while True:
         for hand_landmarks in result.multi_hand_landmarks:
             mp_draw.draw_landmarks(display_frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
             
-            # Get the coordinates of thumb tip and index finger tip
+            # Get the coordinates of the index finger tip
             index_tip = (int(hand_landmarks.landmark[8].x * frame.shape[1]), int(hand_landmarks.landmark[8].y * frame.shape[0]))
 
             if is_pointing_finger_up(hand_landmarks):
                 draw_points.append(index_tip)
                 draw_times.append(time.time())
+                opacities.append(255)  # Full opacity
 
     # Scale points to new size
     scaled_points = scale_points(draw_points, orig_size, new_size)
@@ -87,6 +89,21 @@ while True:
     for i in range(1, len(scaled_points)):
         if draw_times[i] - draw_times[i - 1] < 2:
             cv2.line(display_frame, scaled_points[i - 1], scaled_points[i], (0, 255, 0), 5)
+
+    # Handle auto-clean mode
+    if auto_clean:
+        current_time = time.time()
+        for i in range(len(draw_times)):
+            if current_time - draw_times[i] > 5:
+                opacities[i] = max(0, 255 - int(255 * (current_time - draw_times[i] - 5)))
+            if opacities[i] == 0:
+                draw_points[i] = None
+                draw_times[i] = None
+                opacities[i] = None
+        # Remove None values
+        draw_points = [p for p in draw_points if p is not None]
+        draw_times = [t for t in draw_times if t is not None]
+        opacities = [o for o in opacities if o is not None]
 
     if recording:
         out.write(frame)  # Write the original frame into the file
@@ -99,8 +116,11 @@ while True:
     elif key == ord('c'):
         draw_points = []  # Clear the drawing
         draw_times = []  # Clear the draw times
+        opacities = []   # Clear the opacities
     elif key == ord('r'):
         recording = not recording  # Toggle recording
+    elif key == ord('t'):
+        auto_clean = not auto_clean  # Toggle auto-clean
 
 cap.release()
 out.release()  # Release the VideoWriter object
