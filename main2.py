@@ -52,8 +52,15 @@ window_width = int(display_width * 0.9)
 window_height = int(display_height * 0.9)
 
 # Control recording and auto-clean with boolean variables
-recording = False  # Set this to False to stop recording
+recording = True  # Set this to False to stop recording
 auto_clean = False  # Set this to False to disable auto clean
+clear_screen_time = 0  # Time when the screen was last cleared
+
+# Initialize the Tkinter root window
+root = tk.Tk()
+root.title("Drawing Board")
+root.geometry(f"{window_width}x{window_height}")
+root.resizable(True, True)  # Make the window resizable
 
 while True:
     ret, frame = cap.read()
@@ -108,6 +115,20 @@ while True:
     if recording:
         out.write(frame)  # Write the original frame into the file
 
+    # Add indicators for recording, auto-clean, and screen cleared
+    if recording:
+        cv2.putText(display_frame, "Recording: ON", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+    else:
+        cv2.putText(display_frame, "Recording: OFF", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+
+    if auto_clean:
+        cv2.putText(display_frame, "Auto-Clean: ON", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+    else:
+        cv2.putText(display_frame, "Auto-Clean: OFF", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+
+    if time.time() - clear_screen_time < 3:
+        cv2.putText(display_frame, "Screen Cleared", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+
     cv2.imshow('Frame', display_frame)
 
     key = cv2.waitKey(1) & 0xFF
@@ -117,6 +138,7 @@ while True:
         draw_points = []  # Clear the drawing
         draw_times = []  # Clear the draw times
         opacities = []   # Clear the opacities
+        clear_screen_time = time.time()  # Set the screen cleared time
     elif key == ord('r'):
         recording = not recording  # Toggle recording
     elif key == ord('t'):
